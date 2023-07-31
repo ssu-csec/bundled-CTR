@@ -1,3 +1,5 @@
+#include <iostream>
+#include <iterator>
 #include <string>
 #include <cstring>
 #include <vector>
@@ -43,38 +45,37 @@ byte* metadata_enc(byte* metadata, byte* counter, byte* key, byte* nonce)
 	return meta_cipher;
 }
 
-byte* encryption(byte* nonce, byte* counter, string plaintext, byte* key)	// encrypt data and generate bundle with it
+vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key)	// encrypt data and generate bundle with it
 {
-	byte* bundle;
-	byte* firstblock[AES::BLOCKSIZE];
-	byte* iv[AES::BLOCKSIZE];
+	vector<byte> bundle;
+	byte firstblock[AES::BLOCKSIZE];
+	byte iv[AES::BLOCKSIZE];
 	
 	ECB_Mode<AES>::Encryption ecb;
 	CTR_Mode<AES>::Encryption ctr;
 	
-	fill_n(firstblock + AES::BLOXKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
+	fill_n(firstblock + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
 	memcpy(firstblock, counter, AES::BLOCKSIZE/2);
 	memcpy(iv, nonce, AES::BLOCKSIZE/2);
 	memcpy(iv + AES::BLOCKSIZE/2, counter, AES::BLOCKSIZE/2);
 	
 	byte first_cipher[AES::BLOCKSIZE];
-	ecb.SetKey(key, sizeof(key));
+	ecb.SetKey(key, AES::DEFAULT_KEYLENGTH);
 	ecb.ProcessData(first_cipher, (const byte*)firstblock, AES::BLOCKSIZE);
-	bundle = new byte[plaintext.length() + AES::BLOCKSIZE];
-	memcpy(bundle, first_cipher, AES::BLOCKSIZE);
-	ctr.SetKeyWithIV(key, sizeof(key), iv);
-	ctr.ProcessData(bundle + AES::BLOCKSIZE, (const byte*)plaintext.c_str(), plaintext.length());
+	bundle.insert(bundle.end(), begin(firstblock), end(firstblock));
+	ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, iv);
+	ctr.ProcessData(bundle.data() + AES::BLOCKSIZE, (const byte*)plaintext.c_str(), plaintext.length());
 	
 	return bundle;
 }
 
-void decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)						// decrypt bundles
+vector<byte> decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)						// decrypt bundles
 {
 	vector<byte> plaintext;
 	vector<byte> tmp_bundle;
 	byte tmp_decrypt[sizeof(bundle)] = {(byte)0x00, };
 	int tmp_num = 0;										// the number of data in first data block of a bundle
-	byte plain_meta[sizeof(metadata];						// decrypted metadata
+	byte plain_meta[sizeof(metadata)];						// decrypted metadata
 	byte counter[AES::BLOCKSIZE];							// first counter of each bundle (dynamic data)
 	byte* index = bundle;									// address
 	byte tmp_block[AES::BLOCKSIZE] = {(byte)0x00, };
@@ -97,14 +98,14 @@ void decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)						// de
 			// decrypt previous bundle
 			memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 			ctr.SetKeyWithIV(key, sizeof(key), counter);
-			ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle, tmp_bundle.size());
-			plaintext.insert(plaintext.end(), begin(tmp_decrypt) + (AES::BLOCKSIZE - tmp_num), begin(tmp_decrypt) + tmp_bunde.size());
-			tmp_bundle.clear;
-			memset(tmp_decrypt, (byte)0x00, sizeof(tmp_decrypt);
+			ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
+			plaintext.insert(plaintext.end(), begin(tmp_decrypt) + (AES::BLOCKSIZE - tmp_num), begin(tmp_decrypt) + tmp_bundle.size());
+			tmp_bundle.clear();
+			memset(tmp_decrypt, (byte)0x00, sizeof(tmp_decrypt));
 
 			// decrypt first block and generate counter of new bundle
 			ecb.ProcessData(tmp_block, index, AES::BLOCKSIZE);
-			if(1 != 0 && memcmp(back_ctr, tmp_block, AES::BLOXKSIZE/2) != 0)
+			if(1 != 0 && memcmp(back_ctr, tmp_block, AES::BLOCKSIZE/2) != 0)
 				cout << "Error in block number" << i << endl;
 			memcpy(back_ctr, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 
@@ -133,15 +134,15 @@ void decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)						// de
 	{
 		memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 		ctr.SetKeyWithIV(key, sizeof(key), counter);
-		ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle, tmp_bundle.size());
-		plaintext.insert(plaintext.end(), begin(tmp_decrypt) + (AES::BLOCKSIZE - tmp_num), begin(tmp_decrypt) + tmp_bunde.size());
+		ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
+		plaintext.insert(plaintext.end(), begin(tmp_decrypt) + (AES::BLOCKSIZE - tmp_num), begin(tmp_decrypt) + tmp_bundle.size());
 	}
 
 	return plaintext;
 }
 
 
-class bundledCTR
+/*class bundledCTR
 {
 
 private:
@@ -171,5 +172,5 @@ public:
 	{}
 
 
-}
+}*/
 
