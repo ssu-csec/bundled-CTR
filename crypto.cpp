@@ -141,6 +141,21 @@ vector<byte> decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)			
 	return plaintext;
 }
 
+int search_block_index(byte* metadata, int index)
+{
+	int check = index;
+	int block_index = 0;
+	while(block_index < sizeof(metadata))
+	{
+		check -= (int)metadata[block_index];
+		if (check < 0)
+			return block_index;
+		else if (check > 0)
+			block_index++;
+		else
+			return block_index + 1;
+	}
+}
 
 /*class bundledCTR
 {
@@ -174,3 +189,16 @@ public:
 
 }*/
 
+int main()
+{
+	byte metadata[] = {0x00, 0x10, 0x0f, 0x00, 0x10, 0x10, 0x03, 0x00, 0x04, 0x10, 0x05};
+	int check;
+	int res;
+	cout << "Choose index: ";
+	cin >> check;
+	check = search_block_index(metadata, check);
+	cout << "Result is " << check << endl;
+
+
+	return 0;
+}
