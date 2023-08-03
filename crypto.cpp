@@ -62,7 +62,8 @@ vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key)
 	byte first_cipher[AES::BLOCKSIZE];
 	ecb.SetKey(key, AES::DEFAULT_KEYLENGTH);
 	ecb.ProcessData(first_cipher, (const byte*)firstblock, AES::BLOCKSIZE);
-	bundle.insert(bundle.end(), begin(firstblock), end(firstblock));
+	for(int i = 0; i < AES::BLOCKSIZE; i++)
+		bundle.push_back(firstblock[i]);
 	ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, iv);
 	ctr.ProcessData(bundle.data() + AES::BLOCKSIZE, (const byte*)plaintext.c_str(), plaintext.length());
 	
@@ -99,7 +100,8 @@ vector<byte> decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)			
 			memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 			ctr.SetKeyWithIV(key, sizeof(key), counter);
 			ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
-			plaintext.insert(plaintext.end(), begin(tmp_decrypt) + (AES::BLOCKSIZE - tmp_num), begin(tmp_decrypt) + tmp_bundle.size());
+			for (int j = 0; j < tmp_bundle.size() - AES::BLOCKSIZE + tmp_num; j++)
+				plaintext.push_back(tmp_decrypt[(AES::BLOCKSIZE - tmp_num) + j]);
 			tmp_bundle.clear();
 			memset(tmp_decrypt, (byte)0x00, sizeof(tmp_decrypt));
 
@@ -135,7 +137,8 @@ vector<byte> decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)			
 		memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 		ctr.SetKeyWithIV(key, sizeof(key), counter);
 		ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
-		plaintext.insert(plaintext.end(), begin(tmp_decrypt) + (AES::BLOCKSIZE - tmp_num), begin(tmp_decrypt) + tmp_bundle.size());
+		for (int j = 0; j < tmp_bundle.size() - AES::BLOCKSIZE + tmp_num; j++)
+			plaintext.push_back(tmp_decrypt[(AES::BLOCKSIZE - tmp_num) + j]);
 	}
 
 	return plaintext;
@@ -186,19 +189,9 @@ public:
 	void Replacement(string text, int index)
 	{}
 
+	void Defrag()
+	{}
+
 
 }*/
 
-int main()
-{
-	byte metadata[] = {0x00, 0x10, 0x0f, 0x00, 0x10, 0x10, 0x03, 0x00, 0x04, 0x10, 0x05};
-	int check;
-	int res;
-	cout << "Choose index: ";
-	cin >> check;
-	check = search_block_index(metadata, check);
-	cout << "Result is " << check << endl;
-
-
-	return 0;
-}
