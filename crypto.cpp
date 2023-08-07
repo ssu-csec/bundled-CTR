@@ -70,7 +70,7 @@ vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key)
 	return bundle;
 }
 
-vector<byte> decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)						// decrypt bundles
+vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, byte* metadata)						// decrypt bundles
 {
 	vector<byte> plaintext;
 	vector<byte> tmp_bundle;
@@ -78,7 +78,7 @@ vector<byte> decryption(byte* nonce, byte* bundle, byte* key, byte* metadata)			
 	int tmp_num = 0;										// the number of data in first data block of a bundle
 	byte plain_meta[sizeof(metadata)];						// decrypted metadata
 	byte counter[AES::BLOCKSIZE];							// first counter of each bundle (dynamic data)
-	byte* index = bundle;									// address
+	byte* index = bundle.data();							// address
 	byte tmp_block[AES::BLOCKSIZE] = {(byte)0x00, };
 	byte back_ctr[AES::BLOCKSIZE/2];
 	
@@ -165,8 +165,8 @@ int search_block_index(byte* metadata, int index)
 
 private:
 	
-	byte* main_data;
-	byte* meta_data;
+	vector<byte> main_data;
+	vector<byte> meta_data;
 	byte key[AES::BLOCKSIZE];
 	byte nonce[AES::BLOCKSIZE/2];
 
@@ -174,8 +174,8 @@ public:
 
 	bundledCTR(byte* key, byte* nonce)
 	{
-		this->key = key;
-		this->nonce = nonce;
+		memcpy(this->key,key, AES::BLOCKSIZE);
+		memcpy(this->nonce,nonce, AES::BLOCKSIZE/2);
 	}
 
 	~bundledCTR() {}
