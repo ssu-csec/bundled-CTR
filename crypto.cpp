@@ -10,38 +10,33 @@
 using namespace std;
 using namespace CryptoPP;
 
-
-byte* metadata_gen(int len)
+vector<byte> metadata_gen(int len)
 {
-	byte* metadata;
-	int meta_len = len/AES::BLOCKSIZE;
+	vector<byte> metadata;
 	int remain = len;
 	if(len%16 != 0)
 		meta_len++;
-	metadata = new byte[meta_len + 1];
-	metadata[0] = (byte)0x00;			// the first data of metadata is 0 for counter block
+	metadata.push_back((byte)0x00);			// the first data of metadata is 0 for counter block
 
-	int i = 1;
 	while(remain > AES::BLOCKSIZE)
 	{
-		metadata[i] = (byte)0x10;
+		metadata.push_back((byte)0x10);
 		remain -= AES::BLOCKSIZE;
-		i++;
 	}
-	metadata[i] = (byte)remain;	
+	metadata.push_back((byte)remain);	
 
 	return metadata;
 }
-byte* metadata_enc(byte* metadata, byte* counter, byte* key, byte* nonce)
+vector<byte> metadata_enc(vector<byte> metadata, byte* counter, byte* key, byte* nonce)
 {
-	byte* meta_cipher;
+	vector<byte> meta_cipher;
 	byte meta[sizeof(metadata) + AES::BLOCKSIZE/2];
 	CTR_Mode<AES>::Encryption e;
 	memcpy(meta, counter, AES::BLOCKSIZE/2);
 	memcpy(meta + AES::BLOCKSIZE/2, metadata, sizeof(metadata));
 	meta_cipher = new byte[sizeof(meta)];
 	e.SetKeyWithIV(key, sizeof(key), nonce);
-	e.ProcessData(meta_cipher, (const byte*)meta, sizeof(meta));
+	e.ProcessData(meta_cipher.data(), (const byte*)meta, sizeof(meta));
 	return meta_cipher;
 }
 
