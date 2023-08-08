@@ -31,11 +31,14 @@ vector<byte> metadata_enc(vector<byte> metadata, byte* counter, byte* key, byte*
 {
 	vector<byte> meta_cipher;
 	byte meta[sizeof(metadata) + AES::BLOCKSIZE/2];
+	byte iv[AES::BLOCKSIZE];
+	memcpy(iv, nonce, AES::BLOCKSIZE/2);
+	fill_n(iv+AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
 	CTR_Mode<AES>::Encryption e;
 	memcpy(meta, counter, AES::BLOCKSIZE/2);
 	memcpy(meta + AES::BLOCKSIZE/2, metadata, sizeof(metadata));
 	meta_cipher = new byte[sizeof(meta)];
-	e.SetKeyWithIV(key, sizeof(key), nonce);
+	e.SetKeyWithIV(key, sizeof(key), iv);
 	e.ProcessData(meta_cipher.data(), (const byte*)meta, sizeof(meta));
 	return meta_cipher;
 }
