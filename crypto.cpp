@@ -68,7 +68,7 @@ vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key)
 	return bundle;
 }
 
-vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, byte* metadata)						// decrypt bundles
+vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte> metadata)						// decrypt bundles
 {
 	vector<byte> plaintext;
 	vector<byte> tmp_bundle;
@@ -86,7 +86,7 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, byte* metad
 	
 	fill_n(counter + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
 	ctr.SetKeyWithIV(key, sizeof(key), counter);
-	ctr.ProcessData(plain_meta, (const byte*)metadata, sizeof(metadata));
+	ctr.ProcessData(plain_meta, (const byte*)metadata.data(), sizeof(metadata));
 	
 	ecb.SetKey(key, sizeof(key));
 
