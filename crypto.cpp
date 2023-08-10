@@ -65,7 +65,7 @@ vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce)
 	return metadata;
 }
 
-vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key)	// encrypt data and generate bundle with it
+vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key, byte* back_counter)	// encrypt data and generate bundle with it
 {
 	vector<byte> bundle;
 	byte firstblock[AES::BLOCKSIZE];
@@ -74,7 +74,7 @@ vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key)
 	ECB_Mode<AES>::Encryption ecb;
 	CTR_Mode<AES>::Encryption ctr;
 	
-	fill_n(firstblock + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
+	memcpy(firstblock + AES::BLOCKSIZE/2, back_counter, AES::BLOCKSIZE/2);
 	memcpy(firstblock, counter, AES::BLOCKSIZE/2);
 	memcpy(iv, nonce, AES::BLOCKSIZE/2);
 	memcpy(iv + AES::BLOCKSIZE/2, counter, AES::BLOCKSIZE/2);
