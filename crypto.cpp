@@ -27,20 +27,42 @@ vector<byte> metadata_gen(int len)
 
 	return metadata;
 }
+
 vector<byte> metadata_enc(vector<byte> metadata, byte* counter, byte* key, byte* nonce)
 {
 	vector<byte> meta_cipher;
 	byte meta[sizeof(metadata) + AES::BLOCKSIZE/2];
+	
 	byte iv[AES::BLOCKSIZE];
 	memcpy(iv, nonce, AES::BLOCKSIZE/2);
-	fill_n(iv+AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
-	CTR_Mode<AES>::Encryption e;
+	fill_n(iv + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
+	
 	memcpy(meta, counter, AES::BLOCKSIZE/2);
-	memcpy(meta + AES::BLOCKSIZE/2, metadata, sizeof(metadata));
+	memcpy(meta + AES::BLOCKSIZE/2, metadata.data(), metadata.size());
 	meta_cipher = new byte[sizeof(meta)];
+	
+	CTR_Mode<AES>::Encryption e;
 	e.SetKeyWithIV(key, sizeof(key), iv);
 	e.ProcessData(meta_cipher.data(), (const byte*)meta, sizeof(meta));
 	return meta_cipher;
+}
+
+vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce)
+{
+	vector<byte> metadata;
+	byte tmp_meta[meta_cipher.size()] = {(byte)0x00, };
+	
+	byte iv[AES::BLOCKSIZE];
+	memcpy(iv, nonce, AES::BLOCKSIZE/2);
+	fill_n(iv + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
+
+	CTR_Mode<AES>::Decryption d;
+	d.SetKeyWithIV(key, sizeof(key), iv);
+	d.ProcessData(tmp_meta, (const byte*)meta_cipher.data(), meta_cipher.size());
+
+	metadata.insert(metadata.begin(), begin(tmp_meta) + AES::BLOCKSIZE/2, end(tmp_meta));
+
+	return metadata;
 }
 
 vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key)	// encrypt data and generate bundle with it
@@ -142,23 +164,97 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 	return plaintext;
 }
 
-int search_block_index(byte* metadata, int index)
+class Modi_info
 {
-	int check = index;
-	int block_index = 0;
-	while(block_index < sizeof(metadata))
-	{
-		check -= (int)metadata[block_index];
-		if (check < 0)
-			return block_index;
-		else if (check > 0)
-			block_index++;
-		else
-			return block_index + 1;
-	}
+private:
+	int del_index;
+	int del_len;
+	int ins_index;
+	vector<byte> new_meta;
+	vector<byte> ins_list;
+
+public:
+	
+	Modi_info()
+	{}
+
+	~Modi_info()
+	{}
+
 }
 
-/*class bundledCTR
+
+vector<int> bundle_list_gen(vector<byte> metadata)
+{
+	int check = 0;
+	vector<int> head_list;
+	for (int i = 0; i < metadata.size(); i++)
+	{
+		if (metadata[i] == 0x00)
+		{
+			head_list.push_back(check);
+			check += AES::BLOCKSIZE;
+		}
+		else
+		{
+			check += (int)metadata[i];
+		}
+
+	}
+	return head_list;
+}
+
+int search_real_index(vector<byte> metadata, int index)
+{
+	int real = 0;
+	int check = index;
+	for (int i = 0; i < metadata.size(); i++)
+	{	
+		check -= metadata[i];
+		if (check > 0)
+		{
+			if (metadata[i] == 0x00)
+			{	
+				real += AES::BLOCKSIZE;
+			}
+			else
+			{
+				real += metadata[i];
+			}
+		}
+		else if (check < 0)
+		{
+			check += metadata[i];
+			real += check;
+			break;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+
+	return real;
+
+}
+
+int search_counter_block(vector<int> bundle_list, int index)
+{
+	int counter_index = -1;
+	for (int i = 0; i < bundle_list.size(); i++)
+	{
+		if (bundle_list[i] > index)
+		{
+			index = bundle_list[i - 1];
+			break;
+		}
+	}
+
+	return counter_index;
+}
+
+class bundled_CTR
 {
 
 private:
@@ -170,19 +266,41 @@ private:
 
 public:
 
-	bundledCTR(byte* key, byte* nonce)
+	bundled_CTR(byte* key, byte* nonce)
 	{
 		memcpy(this->key,key, AES::BLOCKSIZE);
 		memcpy(this->nonce,nonce, AES::BLOCKSIZE/2);
 	}
 
-	~bundledCTR() {}
+	~bundled_CTR() {}
 
 	void Insertion(string text, int index)
 	{}
 
-	void Deletion(int del_len, int index)
-	{}
+	Modi_info Deletion(int del_len, int index)
+	{
+		Modi_info modi_info();
+		vector<byte> meta_plain = metadata_dec(this->metadata, this->key, this->nonce);
+		vector<int> bundle_list = bundle_list_gen(meta_plain);
+		
+		int head = search_real_index(meta_plain, index);
+		int tail = search_real_index(meta_plain, index + del_len);
+		int head_ctr_add = search_counter_block(bundle_list, head);
+		int tail_ctr_add = search_counter_block(bundle_list, tail);
+
+		ECB_Mode<AES>::Encryption e;
+		ECB_Mode<AES>::Decryption d;
+		e.SetKey(this->key, sizeof(this->key));
+		d.SetKey(this->key, sizeof(this->key));
+		byte head_counter[AES::BLOCKSIZE] = {0x00, };
+		byte tail_counter[AES::BLOCKSIZE] = {0x00, };
+
+		this->main_data.erase(head, tail);
+
+		// modify metadata and update
+
+		return modi_info;
+	}
 
 	void Replacement(string text, int index)
 	{}
@@ -191,5 +309,5 @@ public:
 	{}
 
 
-}*/
+}
 
