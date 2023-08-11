@@ -282,11 +282,6 @@ public:
 		Modi_info modi_info();
 		vector<byte> meta_plain = metadata_dec(this->metadata, this->key, this->nonce);
 		vector<int> bundle_list = bundle_list_gen(meta_plain);
-		
-		int head = search_real_index(meta_plain, index);
-		int tail = search_real_index(meta_plain, index + del_len);
-		int head_ctr_add = search_counter_block(bundle_list, head);
-		int tail_ctr_add = search_counter_block(bundle_list, tail);
 
 		ECB_Mode<AES>::Encryption e;
 		ECB_Mode<AES>::Decryption d;
@@ -294,7 +289,21 @@ public:
 		d.SetKey(this->key, sizeof(this->key));
 		byte head_counter[AES::BLOCKSIZE] = {0x00, };
 		byte tail_counter[AES::BLOCKSIZE] = {0x00, };
-
+		
+		int head = search_real_index(meta_plain, index);
+		int tail = search_real_index(meta_plain, index + del_len);
+		int head_ctr_adr = search_counter_block(bundle_list, head);
+		int tail_ctr_adr = search_counter_block(bundle_list, tail);
+		
+		memcpy(head_counter, this->main_data.data() + head_ctr_adr, AES::BLOCKSIZE);
+		e.ProcessData(head_counter, head_counter, AES::BLOCKSIZE);
+		if (head_ctr_adr != tail_ctr_adr)
+		{
+			memcpy(tail_counter, this->main_data.data() + tail_ctr_adr, AES::BLOCKSIZE);
+			e.ProcessData(tail_counter, (const byte*) tail_counter, AES::BLOCKSIZE);
+			// find counter(tmp_counter) of the block which has tail index
+			// memcpy(tail_counter, tmp_counter, AES::BLOCKSIZE/2);		// update first block of tail bundle
+		}
 		this->main_data.erase(head, tail);
 
 		// modify metadata and update
