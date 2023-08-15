@@ -275,7 +275,51 @@ public:
 	~bundled_CTR() {}
 
 	void Insertion(string text, int index)
-	{}
+	{// 1) Modi_info 할당
+	Modi_info modi_info_instance;
+
+	// 2) bundle_list 생성
+	vector<byte> meta_plain = metadata_dec(this->meta_data, this->key, this->nonce);
+	vector<int> bundle_list = bundle_list_gen(meta_plain);
+
+	// 3) data가 삽입될 실제 인덱스와 번들 탐색
+	int real_index = search_real_index(meta_plain, index);
+	int head_ctr_add = search_counter_block(bundle_list, real_index);
+
+	// 4) 메타 데이터의 첫 8바이트에 담긴 마지막 사용 카운터(C1) 습득
+	// Assuming meta_data stores the last used counter in the first 8 bytes
+	byte C1[AES::BLOCKSIZE/2];
+	memcpy(C1, meta_data.data(), AES::BLOCKSIZE/2);
+
+	if (head_ctr_add != -1) // 삽입 index가 번들 중간에 위치하는가?
+	{
+		// yes) - 1) 삽입될 위치의 뒷 번들의 첫블록을 복호화하고 연속성 위한 카운터(C2) 습득
+		byte C2[AES::BLOCKSIZE/2];
+		// decrypt the following bundle's first block to get the C2
+		// ... (this part is not clear, you might need more implementation details)
+
+		// yes) - 2) 마지막 카운터(C1)와 습득된 카운터(C2)를 이용하여 삽입 데이터 번들화
+		// ... (you will use C1 and C2 to create the bundled data for insertion)
+
+	}
+	else
+	{
+		// no) - 1) 삽입 인덱스 기준으로 뒷부분을 암호화하는데 사용된 카운터 추정(C3)
+		byte C3[AES::BLOCKSIZE/2];
+		// ... (estimate the counter C3 based on the insertion index)
+
+		// no) - 2) 추정된 카운터(C3)를 이용하여 번들 분화(앞 번들과 뒷번들로 분화)
+		// ... (you will use C3 to split the bundle into front and back parts)
+
+		// no) - 3) 마지막 카운터(C1)와 추정된 카운터(C3)를 사용하여 삽입 데이터 번들화
+		// ... (you will use C1 and C3 to create the bundled data for insertion)
+	}
+
+	// 5) 삽입 번들 기존 번들사이에 삽입
+	// ... (you will insert the new bundled data in the middle of the existing data)
+
+	// 6) 메타데이터에 메인데이터의 삽입사항 반영하여 업데이트
+	// ... (you will update the meta_data to reflect the changes in the main_data)}
 
 	Modi_info Deletion(int del_len, int index)
 	{
