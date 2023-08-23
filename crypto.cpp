@@ -203,55 +203,46 @@ vector<int> bundle_list_gen(vector<byte> metadata)
 	}
 	return head_list;
 }
+int search_block_index(vector<byte> metadata, int index)
+{
+	int check = index;
+	int block_index = 0;
+	while(block_index < metadata.size())
+	{
+		check -= metadata[block_index];
+		if(check < 0)
+			return block_index;
+		else if (check > 0)
+			block_index++;
+		else
+			return block_index + 1;
+	}
+}
 
 int search_real_index(vector<byte> metadata, int index)
 {
 	int real = 0;
-	int check = index;
-	for (int i = 0; i < metadata.size(); i++)
-	{	
-		check -= metadata[i];
-		if (check > 0)
-		{
-			if (metadata[i] == 0x00)
-			{	
-				real += AES::BLOCKSIZE;
-			}
-			else
-			{
-				real += metadata[i];
-			}
-		}
-		else if (check < 0)
-		{
-			check += metadata[i];
-			real += check;
-			break;
-		}
+	for (int i = 0; i < index; i++)
+	{
+		if(metadata[i] == 0x00)
+			real += AES::BLOCKSIZE;
 		else
-		{
-			break;
-		}
+			real += (int)metadata[i];	
 	}
-
-
 	return real;
-
 }
 
-int search_counter_block(vector<int> bundle_list, int index)
+int search_counter_block(vector<byte> metadata, int index)
 {
-	int counter_index = -1;
-	for (int i = 0; i < bundle_list.size(); i++)
+	for (int i = index; i > 0; i--)
 	{
-		if (bundle_list[i] > index)
+		if (metadata[i] == 0x00)
 		{
-			index = bundle_list[i - 1];
-			break;
+			return i;
 		}
 	}
 
-	return counter_index;
+	return 0;
 }
 
 class bundled_CTR
@@ -279,36 +270,6 @@ public:
 
 	Modi_info Deletion(int del_len, int index)
 	{
-		Modi_info modi_info();
-		vector<byte> meta_plain = metadata_dec(this->metadata, this->key, this->nonce);
-		vector<int> bundle_list = bundle_list_gen(meta_plain);
-
-		ECB_Mode<AES>::Encryption e;
-		ECB_Mode<AES>::Decryption d;
-		e.SetKey(this->key, sizeof(this->key));
-		d.SetKey(this->key, sizeof(this->key));
-		byte head_counter[AES::BLOCKSIZE] = {0x00, };
-		byte tail_counter[AES::BLOCKSIZE] = {0x00, };
-		
-		int head = search_real_index(meta_plain, index);
-		int tail = search_real_index(meta_plain, index + del_len);
-		int head_ctr_adr = search_counter_block(bundle_list, head);
-		int tail_ctr_adr = search_counter_block(bundle_list, tail);
-		
-		memcpy(head_counter, this->main_data.data() + head_ctr_adr, AES::BLOCKSIZE);
-		e.ProcessData(head_counter, head_counter, AES::BLOCKSIZE);
-		if (head_ctr_adr != tail_ctr_adr)
-		{
-			memcpy(tail_counter, this->main_data.data() + tail_ctr_adr, AES::BLOCKSIZE);
-			e.ProcessData(tail_counter, (const byte*) tail_counter, AES::BLOCKSIZE);
-			// find counter(tmp_counter) of the block which has tail index
-			// memcpy(tail_counter, tmp_counter, AES::BLOCKSIZE/2);		// update first block of tail bundle
-		}
-		this->main_data.erase(head, tail);
-
-		// modify metadata and update
-
-		return modi_info;
 	}
 
 	void Replacement(string text, int index)
