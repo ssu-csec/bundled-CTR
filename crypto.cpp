@@ -142,7 +142,31 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 	return plaintext;
 }
 
+<<<<<<< Updated upstream
 int search_block_index(byte* metadata, int index)
+=======
+class Modi_info
+{
+private:
+	int del_index;
+	int del_len;
+	int ins_index;
+	vector<byte> new_meta;
+	vector<byte> ins_list;
+
+public:
+	
+	Modi_info()
+	{}
+
+	~Modi_info()
+	{}
+
+}
+
+}
+int search_block_index(vector<byte> metadata, int index)
+>>>>>>> Stashed changes
 {
 	int check = index;
 	int block_index = 0;
@@ -156,6 +180,8 @@ int search_block_index(byte* metadata, int index)
 		else
 			return block_index + 1;
 	}
+
+	return block_index;
 }
 
 /*class bundledCTR
@@ -181,8 +207,66 @@ public:
 	void Insertion(string text, int index)
 	{}
 
+<<<<<<< Updated upstream
 	void Deletion(int del_len, int index)
 	{}
+=======
+	Modi_info Deletion(int del_len, int index)
+	{
+		Modi_info modi_info();
+		vector<byte> meta_plain = metadata_dec(this->metadata, this->key, this->nonce);
+
+		ECB_Mode<AES>::Encryption e;
+		ECB_Mode<AES>::Decryption d;
+		e.SetKey(this->key, sizeof(this->key));
+		d.SetKey(this->key, sizeof(this->key));
+		
+		int f_block_index = search_block_index(meta_plain, index);
+		int b_block_index = search_block_index(meta_plain, index + del_len);
+		int f_in_index = index;
+		for(int i = 0; i < f_block_index; i++)
+		{
+			f_in_index -= (int)meta_plain[i];
+		}
+		int b_in_index = index + del_len;
+		for(int i = 0; i < b_in_index; i++)
+		{
+			b_in_index -= (int)meta_plain[i];
+		}
+		if (meta_plain[f_block_index] == 0x00 && meta_plain[b_block_index] == 0x00)	// case1: remove bundle(s)
+		{
+			if(f_block_index != 0)
+			{
+				int f_ctr_index = search_counter_block(meta_plain, f_block_index - 1);
+				int f_real_index = search_real_index(meta_plain, f_ctr_block);
+				int b_real_index = search_real_index(meta_plain, b_block_index);
+				byte f_ctr_block[AES::BLOCKSIZE] = {0x00, };
+				byte b_ctr_block[AES::BLOCKSIZE] = {0x00, };
+				d.processData(f_ctr_block, (const byte*)(this->data.data() + f_real_index), AES::BLOCKSIZE);
+				d.ProcessData(b_ctr_block, (const byte*)(this->data.data() + b_real_index), AES::BLOCKSIZE);
+				memcpy(f_ctr_block + AES::BLOCKSIZE/2, b_ctr_block, AES::BLOCKSIZE/2);
+				e.ProcessData(this->data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);		// replace first counter block of previous bundle
+			}
+		}
+		else
+		{
+			int f_ctr_block = search_counter_block(meta_plain, f_block_index);
+			int b_ctr_block = search_counter_block(meta_plain, b_block_index);
+			
+			if (f_ctr_block == b_ctr_block)											// case2: remove part of a block
+			{
+
+			}
+
+			else																	// case3: remove data in bundles
+			{}
+		}
+
+		
+		// modify metadata and update
+		return modi_info;
+	}
+>>>>>>> Stashed changes
 
 	void Replacement(string text, int index)
 	{}
