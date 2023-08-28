@@ -180,6 +180,25 @@ int search_block_index(vector<byte> metadata, int index)
 		else
 			return block_index + 1;
 	}
+<<<<<<< Updated upstream
+=======
+
+	return block_index;
+}
+
+int search_real_index(vector<byte> metadata, int index)
+{
+	int real = 0;
+	for (int i = 0; i < index; i++)
+	{
+		if(metadata[i] == 0x00)
+			real += AES::BLOCKSIZE;
+		else
+			real += (int)metadata[i];	
+	}
+	return real;
+}
+>>>>>>> Stashed changes
 
 	return block_index;
 }
