@@ -63,7 +63,7 @@ vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce)
 	d.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, iv);
 	d.ProcessData(tmp_meta, (const byte*)meta_cipher.data(), meta_cipher.size());
 
-	metadata.insert(metadata.end(), tmp_meta + AES::BLOCKSIZE/2, &tmp_meta[-1]);
+	metadata.insert(metadata.end(), tmp_meta + AES::BLOCKSIZE/2, tmp_meta + sizeof(tmp_meta));
 
 	return metadata;
 }
@@ -102,29 +102,27 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 	vector<byte> tmp_bundle;
 	byte tmp_decrypt[bundle.size()] = {(byte)0x00, };
 	int tmp_num = 0;										// the number of data in first data block of a bundle
-	byte plain_meta[metadata.size()];						// decrypted metadata
-	byte counter[AES::BLOCKSIZE] = {0x00, };							// first counter of each bundle (dynamic data)
 	byte* index = bundle.data();							// address
 	byte tmp_block[AES::BLOCKSIZE] = {(byte)0x00, };
 	byte back_ctr[AES::BLOCKSIZE/2];
 	
-	ECB_Mode<AES>::Decryption ecb;
-	CTR_Mode<AES>::Decryption ctr;
+	byte counter[AES::BLOCKSIZE] = {0x00, };				// counter block of each bundle
 	memcpy(counter, nonce, AES::BLOCKSIZE/2);
-	
-	ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, counter);
-	ctr.ProcessData(plain_meta, (const byte*)metadata.data(), sizeof(metadata));
-	
+
+	ECB_Mode<AES>::Decryption ecb;
+	CTR_Mode<AES>::Decryption ctr;	
 	ecb.SetKey(key, AES::DEFAULT_KEYLENGTH);
+
+	vector<byte> plain_meta = metadata_dec(metadata, key, nonce);
 	
-	for(int i = AES::BLOCKSIZE/2; i < sizeof(plain_meta); i++)
+	for(int i = 0; i < plain_meta.size(); i++)
 	{
 		if(plain_meta[i] == (byte)0x00)
 		{
+			memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 			if(tmp_bundle.size() != 0)
 			{
 				// decrypt previous bundle
-				memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 				ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, counter);
 				ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
 				for (int j = 0; j < tmp_bundle.size() - AES::BLOCKSIZE + tmp_num; j++)
@@ -143,10 +141,10 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 		else
 		{
 			// insert block data to tmp_bundle
-			if(plain_meta[i - 1] == (byte)0x00)			// first data block of a bundle
+			if(plain_meta[i - 1] == (byte)0x00 && plain_meta.size() - 1 != i && plain_meta[i + 1] != 0)			// first data block of a bundle
 			{
-				tmp_num = (int)plain_meta[i];
-				for(int j = 0; j < AES::BLOCKSIZE - (int)plain_meta[i]; j++)
+				tmp_num = AES::BLOCKSIZE - (int)plain_meta[i];
+				for(int j = 0; j < tmp_num; j++)
 				{
 					tmp_bundle.push_back(0x00);
 				}
@@ -164,8 +162,8 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 		memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 		ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, counter);
 		ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
-		for (int j = 0; j < tmp_bundle.size() - AES::BLOCKSIZE + tmp_num; j++)
-			plaintext.push_back(tmp_decrypt[(AES::BLOCKSIZE - tmp_num) + j]);
+		for (int j = tmp_num; j < tmp_bundle.size(); j++)
+			plaintext.push_back(tmp_decrypt[j]);
 	}
 
 	return plaintext;
