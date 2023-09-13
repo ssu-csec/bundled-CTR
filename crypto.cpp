@@ -50,7 +50,7 @@ vector<byte> metadata_enc(vector<byte> metadata, byte* counter, byte* key, byte*
 	return meta_cipher;
 }
 
-vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce)
+vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce, byte* rec_ctr)
 {
 	vector<byte> metadata;
 	byte tmp_meta[meta_cipher.size()] = {(byte)0x00, };
@@ -62,7 +62,7 @@ vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce)
 	CTR_Mode<AES>::Decryption d;
 	d.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, iv);
 	d.ProcessData(tmp_meta, (const byte*)meta_cipher.data(), meta_cipher.size());
-
+	memcpy(rec_ctr, tmp_meta, AES::BLOCKSIZE/2);
 	metadata.insert(metadata.end(), tmp_meta + AES::BLOCKSIZE/2, tmp_meta + sizeof(tmp_meta));
 
 	return metadata;
@@ -100,11 +100,12 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 {
 	vector<byte> plaintext;
 	vector<byte> tmp_bundle;
-	byte tmp_decrypt[bundle.size()] = {(byte)0x00, };
+	byte tmp_decrypt[bundle.size()] = {0x00, };
 	int tmp_num = 0;										// the number of data in first data block of a bundle
 	byte* index = bundle.data();							// address
-	byte tmp_block[AES::BLOCKSIZE] = {(byte)0x00, };
-	byte back_ctr[AES::BLOCKSIZE/2];
+	byte tmp_block[AES::BLOCKSIZE] = {0x00, };
+	byte back_ctr[AES::BLOCKSIZE/2] = {0x00, };
+	byte recent_ctr[AES::BLOCKSIZE/2] = {0x00, };
 	
 	byte counter[AES::BLOCKSIZE] = {0x00, };				// counter block of each bundle
 	memcpy(counter, nonce, AES::BLOCKSIZE/2);
@@ -113,7 +114,7 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 	CTR_Mode<AES>::Decryption ctr;	
 	ecb.SetKey(key, AES::DEFAULT_KEYLENGTH);
 
-	vector<byte> plain_meta = metadata_dec(metadata, key, nonce);
+	vector<byte> plain_meta = metadata_dec(metadata, key, nonce, recent_ctr);
 	
 	for(int i = 0; i < plain_meta.size(); i++)
 	{

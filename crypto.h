@@ -33,7 +33,7 @@ vector<byte> metadata_gen(int len);
 
 vector<byte> metadata_enc(vector<byte> metadata, byte* counter, byte* key, byte* nonce);
 
-vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce);
+vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce, byte* rec_ctr);
 
 vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key, byte* back_counter);
 
