@@ -245,6 +245,9 @@ bundled_CTR::bundled_CTR(byte* key, byte* nonce)
 	memcpy(this->nonce,nonce, AES::BLOCKSIZE/2);
 }
 
+bundled_CTR::~bundled_CTR()
+{}
+
 Modi_info bundled_CTR::Insertion(string text, int index)
 {}
 
@@ -285,7 +288,6 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 			e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);		// replace first counter block of previous bundle
 		}
 		meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index);			// update metadata
-
 	}
 	else
 	{
@@ -326,4 +328,35 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 }
 
 Modi_info bundled_CTR::Replacement(string text, int index)
-{}
+{
+	Modi_info modi_info;
+	vector<byte> meta_plain = metadata_dec(this->meta_data, this->key, this->nonce);
+
+	ECB_Mode<AES>::Encryption e;
+	ECB_Mode<AES>::Decryption d;
+	e.SetKey(this->key, sizeof(this->key));
+	d.SetKey(this->key, sizeof(this->key));
+
+	int f_block_index = search_block_index(meta_plain, index);
+	int b_block_index = search_block_index(meta_plain, index + del_len);
+	int f_in_index = index;
+	for(int i = 0; i < f_block_index; i++)
+	{   
+		f_in_index -= (int)meta_plain[i];
+	}   
+	int b_in_index = index + del_len;
+	for(int i = 0; i < b_in_index; i++)
+	{   
+		b_in_index -= (int)meta_plain[i];
+	}   
+	if (meta_plain[f_block_index] == 0x00 && meta_plain[b_block_index] == 0x00) // case1: replace bundle(s)
+	{   
+	}   
+	else																		// case2: replace some parts
+	{   
+	}
+
+
+	return modi_info;
+
+}
