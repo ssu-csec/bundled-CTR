@@ -40,11 +40,10 @@ vector<byte> metadata_gen(int len)
 vector<byte> metadata_enc(vector<byte> metadata, byte* counter, byte* key, byte* nonce)
 {
 	vector<byte> meta_cipher;
-	byte meta[metadata.size() + AES::BLOCKSIZE/2];
+	byte meta[metadata.size() + AES::BLOCKSIZE/2] = {0x00, };
 
-	byte iv[AES::BLOCKSIZE];
+	byte iv[AES::BLOCKSIZE] = {0x00, };
 	memcpy(iv, nonce, AES::BLOCKSIZE/2);
-	fill_n(iv + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2, (byte)0x00);
 
 	memcpy(meta, counter, AES::BLOCKSIZE/2);
 	memcpy(meta + AES::BLOCKSIZE/2, metadata.data(), metadata.size());
@@ -129,29 +128,29 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 	{
 		if(plain_meta[i] == (byte)0x00)
 		{
-			memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
+			memcpy(counter + AES::BLOCKSIZE/2, tmp_block, AES::BLOCKSIZE/2);
 			if(tmp_bundle.size() != 0)
 			{
 				// decrypt previous bundle
 				ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, counter);
 				ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
-				for (int j = 0; j < tmp_bundle.size() - AES::BLOCKSIZE + tmp_num; j++)
-					plaintext.push_back(tmp_decrypt[(AES::BLOCKSIZE - tmp_num) + j]);
+				for (int j = 0; j < tmp_bundle.size() -  tmp_num; j++)
+					plaintext.push_back(tmp_decrypt[j + tmp_num]);
 				tmp_bundle.clear();
 				memset(tmp_decrypt, (byte)0x00, sizeof(tmp_decrypt));
-
-				// decrypt first block and generate counter of new bundle
-				ecb.ProcessData(tmp_block, index, AES::BLOCKSIZE);
-				if(1 != 0 && memcmp(back_ctr, tmp_block, AES::BLOCKSIZE/2) != 0)
-					cout << "Error in block number" << i << endl;
-				memcpy(back_ctr, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 			}
+			// decrypt first block and generate counter of new bundle
+			ecb.ProcessData(tmp_block, index, AES::BLOCKSIZE);
+			if(i != 0 && memcmp(back_ctr, tmp_block, AES::BLOCKSIZE/2) != 0)
+				cout << "Error in block number" << i << endl;
+			memcpy(back_ctr, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
+			
 			index += AES::BLOCKSIZE;
 		}
 		else
 		{
 			// insert block data to tmp_bundle
-			if(plain_meta[i - 1] == (byte)0x00 && plain_meta.size() - 1 != i && plain_meta[i + 1] != 0)			// first data block of a bundle
+			if(plain_meta[i - 1] == (byte)0x00 && plain_meta.size() - 1 != i && plain_meta[i + 1] != 0x00)			// first data block of a bundle
 			{
 				tmp_num = AES::BLOCKSIZE - (int)plain_meta[i];
 				for(int j = 0; j < tmp_num; j++)
@@ -169,7 +168,7 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 	}
 	if(tmp_bundle.size() != 0)
 	{
-		memcpy(counter + AES::BLOCKSIZE/2, tmp_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
+		memcpy(counter + AES::BLOCKSIZE/2, tmp_block, AES::BLOCKSIZE/2);
 		ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, counter);
 		ctr.ProcessData(tmp_decrypt, (const byte*)tmp_bundle.data(), tmp_bundle.size());
 		for (int j = tmp_num; j < tmp_bundle.size(); j++)
@@ -204,6 +203,8 @@ int search_block_index(vector<byte> metadata, int index)
 	int block_index = 0;
 	while(block_index < metadata.size())
 	{
+		if(index == 0)
+			break;
 		check -= metadata[block_index];
 		if(check < 0)
 			return block_index;
@@ -241,6 +242,46 @@ int search_counter_block(vector<byte> metadata, int index)
 	return 0;
 }
 
+byte* find_ctr(byte* counter, int num)
+{
+	byte* res = new byte[AES::BLOCKSIZE/2];
+	memcpy(res, counter, AES::BLOCKSIZE/2);
+	long long tmp_ctr = 0;
+	unsigned int check = 1;
+	if (*(char *)&check == 1) 			// little endian
+	{
+		int start = 0;
+		int end = 7;
+		while (start < end) {
+			int temp = res[start];
+			res[start] = res[end];
+			res[end] = temp;
+
+			start++;
+			end--;
+		}
+	}
+	memcpy(&tmp_ctr, res, AES::BLOCKSIZE/2);
+	tmp_ctr += (long long)num;
+	memcpy(res, &tmp_ctr, AES::BLOCKSIZE/2);
+	if (*(char *)&check == 1)           // little endian
+	{
+		int start = 0;
+		int end = 7;
+		while (start < end) {
+			// swap
+			int temp = res[start];
+			res[start] = res[end];
+			res[end] = temp;
+
+			start++;
+			end--;
+		}
+	}
+
+	return res;
+}
+
 bundled_CTR::bundled_CTR(byte* key, byte* nonce)
 {
 	memcpy(this->key,key, AES::BLOCKSIZE);
@@ -259,16 +300,50 @@ bundled_CTR::~bundled_CTR()
 
 vector<byte> bundled_CTR::print_data()
 {
-	    return this->main_data;
+	return this->main_data;
 }
 
 vector<byte> bundled_CTR::print_meta()
 {
-	    return this->meta_data;
+	return this->meta_data;
 }
 
 Modi_info bundled_CTR::Insertion(string text, int index)
-{}
+{
+	Modi_info modi_info;
+	byte recent_ctr[AES::BLOCKSIZE/2] = {0x00, };
+	byte new_recent_ctr[AES::BLOCKSIZE/2] = {0x00, };
+	vector<byte> meta_plain = metadata_dec(this->meta_data, this->key, this->nonce, recent_ctr);
+	vector<int> bundle_list = bundle_list_gen(meta_plain);
+
+	ECB_Mode<AES>::Encryption e;
+	ECB_Mode<AES>::Decryption d;
+	e.SetKey(this->key, sizeof(this->key));
+	d.SetKey(this->key, sizeof(this->key));
+
+	int block_index = search_block_index(meta_plain, index);
+	int in_index = index;
+	for(int i = 0; i < block_index; i++)
+	{
+		in_index -= (int)meta_plain[i];
+	}
+
+	if(block_index == meta_plain.size())					// case1: append
+	{
+		int f_ctr_index = search_counter_block(meta_plain, block_index - 1);
+		int f_real_index = search_real_index(meta_plain, f_ctr_index);
+		byte f_ctr_block[AES::BLOCKSIZE];
+		d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
+		vector<byte> new_data = encryption(this->nonce, recent_ctr, text, this>key, )
+ 
+	}
+	else if(meta_plain[block_index] == 0x00 && in_index == 0)		// case2: insert between two bundles
+	{}
+	else				// case3: remains
+	{}
+
+	return modi_info;
+}
 
 Modi_info bundled_CTR::Deletion(int del_len, int index)
 {
@@ -295,27 +370,57 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 	}
 	int f_remove_index = search_real_index(meta_plain, f_block_index) + f_in_index;
 	int b_remove_index = search_real_index(meta_plain, b_block_index) + b_in_index;
-	if (meta_plain[f_block_index] == 0x00 && meta_plain[b_block_index] == 0x00)	// case1: remove bundle(s)
+	if (meta_plain[f_block_index] == 0x00)	// case1: remove bundle(s)
 	{
-		if(f_block_index != 0)
+		if (meta_plain[b_block_index] == 0x00)
 		{
-			int f_ctr_index = search_counter_block(meta_plain, f_block_index - 1);
-			int f_real_index = search_real_index(meta_plain, f_ctr_index);
-			int b_real_index = search_real_index(meta_plain, b_block_index);
-			byte f_ctr_block[AES::BLOCKSIZE] = {0x00, };
-			byte b_ctr_block[AES::BLOCKSIZE] = {0x00, };
-			d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
-			d.ProcessData(b_ctr_block, (const byte*)(this->main_data.data() + b_real_index), AES::BLOCKSIZE);
-			memcpy(f_ctr_block + AES::BLOCKSIZE/2, b_ctr_block, AES::BLOCKSIZE/2);
-			e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);		// replace first counter block of previous bundle
+			if(f_block_index != 0)
+			{
+				int f_ctr_index = search_counter_block(meta_plain, f_block_index - 1);
+				int f_real_index = search_real_index(meta_plain, f_ctr_index);
+				int b_real_index = search_real_index(meta_plain, b_block_index);
+				byte f_ctr_block[AES::BLOCKSIZE] = {0x00, };
+				byte b_ctr_block[AES::BLOCKSIZE] = {0x00, };
+				d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
+				d.ProcessData(b_ctr_block, (const byte*)(this->main_data.data() + b_real_index), AES::BLOCKSIZE);
+				memcpy(f_ctr_block + AES::BLOCKSIZE/2, b_ctr_block, AES::BLOCKSIZE/2);
+				e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);		// replace first counter block of previous bundle
+			}
+			meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index);			// update metadata
 		}
-		meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index);			// update metadata
+		else							// case2: remove from front part of a bundle
+		{
+			int b_ctr_index = search_counter_block(meta_plain, b_block_index);
+			int b_real_index = search_real_index(meta_plain, b_ctr_index);
+
+			byte b_ctr_block[AES::BLOCKSIZE]; 
+			d.ProcessData(b_ctr_block, (const byte*)(this->main_data.data() + b_real_index), AES::BLOCKSIZE);
+
+			byte* new_ctr = find_ctr(b_ctr_block, (b_block_index - b_ctr_index - 1));
+			memcpy(b_ctr_block, new_ctr, AES::BLOCKSIZE/2);
+
+			if(f_block_index != 0)
+			{
+				int f_ctr_index = search_counter_block(meta_plain, f_block_index - 1);
+				int f_real_index = search_real_index(meta_plain, f_ctr_index);
+
+				byte f_ctr_block[AES::BLOCKSIZE];
+				d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
+				memcpy(f_ctr_block + AES::BLOCKSIZE/2, new_ctr, AES::BLOCKSIZE/2);
+
+				e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);     // replace first counter block of previous bundle
+			}
+			e.ProcessData(b_ctr_block, (const byte*)b_ctr_block, AES::BLOCKSIZE);
+			this->main_data.insert(this->main_data.begin() + b_remove_index, b_ctr_block, b_ctr_block + AES::BLOCKSIZE);
+
+			meta_plain[b_block_index] -= (int)b_in_index;
+			meta_plain.erase(meta_plain.begin() + f_block_index + 1, meta_plain.begin() + b_block_index);
+		}
 	}
-	else
+	else					
 	{
 		int f_ctr_index = search_counter_block(meta_plain, f_block_index);
 		int b_ctr_index = search_counter_block(meta_plain, b_block_index);
-
 		int f_real_index = search_real_index(meta_plain, f_ctr_index);
 		int b_real_index = search_real_index(meta_plain, b_ctr_index);
 
@@ -323,24 +428,29 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 		byte b_ctr_block[AES::BLOCKSIZE];
 		d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
 		d.ProcessData(b_ctr_block, (const byte*)(this->main_data.data() + b_real_index), AES::BLOCKSIZE);
-		long long b_ctr;
-		memcpy(&b_ctr, b_ctr_block, AES::BLOCKSIZE/2);
-		b_ctr = b_ctr + (long long)(b_block_index - b_ctr_index - 1);
-		memcpy(f_ctr_block + AES::BLOCKSIZE/2, &b_ctr, AES::BLOCKSIZE/2);
+		if(b_ctr_index == b_block_index)
+		{
+			memcpy(f_ctr_block + AES::BLOCKSIZE/2, b_ctr_block, AES::BLOCKSIZE/2);
+			meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index);
+		}
+		else
+		{
+			byte* b_ctr = find_ctr(b_ctr_block, (b_block_index - b_ctr_index - 1));
+			memcpy(f_ctr_block + AES::BLOCKSIZE/2, b_ctr, AES::BLOCKSIZE/2);
 
-		byte new_ctr_block[AES::BLOCKSIZE] = {0, };				// new counter block of back block
-		memcpy(new_ctr_block, &b_ctr, AES::BLOCKSIZE/2);
-		memcpy(new_ctr_block + AES::BLOCKSIZE/2, b_ctr_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
-		e.ProcessData(new_ctr_block, (const byte*)new_ctr_block, AES::BLOCKSIZE);
-		main_data.insert(this->main_data.begin() + b_remove_index, new_ctr_block, new_ctr_block + AES::BLOCKSIZE);
+			byte new_ctr_block[AES::BLOCKSIZE] = {0, };				// new counter block of back block
+			memcpy(new_ctr_block, b_ctr, AES::BLOCKSIZE/2);
+			memcpy(new_ctr_block + AES::BLOCKSIZE/2, b_ctr_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
+			e.ProcessData(new_ctr_block, (const byte*)new_ctr_block, AES::BLOCKSIZE);
+			main_data.insert(this->main_data.begin() + b_remove_index, new_ctr_block, new_ctr_block + AES::BLOCKSIZE);
 
-		e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);      // replace first counter block of previous bundle
-		b_in_index = (int)meta_plain[b_block_index] - b_in_index;
-		meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index + 1);
-		meta_plain.insert(meta_plain.begin() + f_block_index, (byte)b_in_index);
-		meta_plain.insert(meta_plain.begin() + f_block_index, 0x00);
+			b_in_index = (int)meta_plain[b_block_index] - b_in_index;
+			meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index + 1);
+			meta_plain.insert(meta_plain.begin() + f_block_index, (byte)b_in_index);
+			meta_plain.insert(meta_plain.begin() + f_block_index, 0x00);
+		}	
 		meta_plain.insert(meta_plain.begin() + f_block_index, (byte)f_in_index);
-
+		e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);      // replace first counter block of previous bundle
 	}
 	this->main_data.erase(this->main_data.begin() + f_remove_index, this->main_data.begin() + b_remove_index);
 	this->meta_data = metadata_enc(meta_plain, recent_ctr, this->key, this->nonce);
@@ -388,7 +498,7 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 		d.ProcessData(b_ctr_block, (this->main_data.data() + b_remove_index), AES::BLOCKSIZE);
 		this->main_data.erase(this->main_data.begin() + f_remove_index, this->main_data.begin() + b_remove_index);
 		vector<byte> rep_list = encryption(this->nonce, recent_ctr, text, this->key, b_ctr_block);
-
+		this->main_data.insert(this->main_data.begin() + f_remove_index, rep_list.data(), rep_list.data() + rep_list.size());
 	}   
 	else																		// case2: replace some parts
 	{   
@@ -398,3 +508,4 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 	return modi_info;
 
 }
+

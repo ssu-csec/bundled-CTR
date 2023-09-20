@@ -45,6 +45,8 @@ int search_real_index(vector<byte> metadata, int index);
 
 int search_counter_block(vector<byte> metadata, int index);
 
+byte* find_ctr(byte* counter, int num);
+
 class bundled_CTR
 {
 	private:
@@ -70,6 +72,7 @@ class bundled_CTR
 		Modi_info Deletion(int del_len, int index);
 
 		Modi_info Replacement(string text, int index);
+		
 };
 
 
