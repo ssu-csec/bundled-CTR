@@ -73,6 +73,7 @@ class bundled_CTR
 
 		Modi_info Replacement(string text, int index);
 		
+		void Defrag();
 };
 
 
