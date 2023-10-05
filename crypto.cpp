@@ -637,7 +637,54 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 	for(int i = 0; i < b_in_index; i++)
 	{   
 		b_in_index -= (int)meta_plain[i];
-	}   
+	}
+
+	if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index - 1] == 0x00)            // cut the first block in bundle
+	{   
+		string tmp_str = ""; 
+		int dec_index = search_real_index(meta_plain, f_block_index - 1); 
+		byte ctr_block[AES::BLOCKSIZE];
+		d.ProcessData(ctr_block, (const byte*)(this->main_data.data() + dec_index), AES::BLOCKSIZE);
+		memcpy(ctr_block + AES::BLOCKSIZE/2, ctr_block, AES::BLOCKSIZE/2);
+		memcpy(ctr_block, this->nonce, AES::BLOCKSIZE/2);
+		e.ProcessData(ctr_block, (const byte*)ctr_block, AES::BLOCKSIZE);
+		for (int i = 0; i < in_index; i++)
+		{   
+			tmp_str += to_string(ctr_block[(AES::BLOCKSIZE - (int)meta_plain[block_index]) + i]^this->main_data[dec_index + AES::BLOCKSIZE + i]);
+		}   
+		text = tmp_str + text;
+		this->main_data.erase(this->main_data.begin() + dec_index + AES::BLOCKSIZE, this->main_data.begin() + dec_index + AES::BLOCKSIZE + in_index);
+		meta_plain[block_index] -= (byte)f_in_index;
+		block_index--;
+		f_in_index = 0;
+	}
+
+	if(meta_plain[b_block_index] != AES::BLOCKSIZE && meta_plain[b_block_index - 1] != 0x00)			// cut the last block in bundle
+	{   
+		string tmp_str = "";
+		int ctr_index = search_block_index(meta_plain, b_block_index);
+		int dec_index = search_real_index(meta_plain, ctr_index);
+		int real_index = search_real_index(meta_plain, b_block_index);
+		byte ctr_block[AES::BLOCKSIZE];
+		d.ProcessData(ctr_block, (const byte*)(this->main_data.data() + dec_index), AES::BLOCKSIZE);
+		byte* index_block_ctr = find_ctr(ctr_block, block_index - ctr_index - 1);
+		memcpy(ctr_block, this->nonce, AES::BLOCKSIZE/2);
+		memcpy(ctr_block + AES::BLOCKSIZE/2, index_block_ctr, AES::BLOCKSIZE/2);
+		e.ProcessData(ctr_block, (const byte*)ctr_block, AES::BLOCKSIZE);
+		for(int i = b_in_index; i < meta_plain[b_block_index]; i++)
+		{
+			tmp_str += to_string(ctr_block[i]^this->main_data[real_index + i]);
+		}
+		text = text + tmp_str;
+		this->main_data.erase(this->main_data.begin() + real_index + b_in_index, this->main_data.begin() + real_index + (int)meta_plain[b_block_index]);
+		meta_plain[b_block_index] = (byte)b_in_index;
+		block_index++;
+		delete[] index_block_ctr;
+		b_in_index = 0;
+	}
+	int f_rep_index = search_real_index(meta_plain, f_block_index) + f_in_index;
+	int b_rep_index = search_real_index(meta_plain, b_block_index) + b_in_index;
+
 	if (meta_plain[f_block_index] == 0x00 && meta_plain[b_block_index] == 0x00) // case1: replace bundle(s)
 	{ 
 		if(f_block_index != 0)
