@@ -726,7 +726,7 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 		byte f_ctr_block[AES::BLOCKSIZE];
 		d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
 		memcpy(f_ctr_block + AES::BLOCKSIZE/2, recent_ctr, AES::BLOCKSIZE/2);
-		e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKIZE);				// replace the counter block of previous bundle
+		e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);				// replace the counter block of previous bundle
 	}
 	if (meta_plain[b_block_index] == 0x00)      // case2-1: replace to the end part of a bundle
 	{
@@ -740,7 +740,7 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 		int b_ctr_index = search_counter_block(meta_plain, b_block_index);
 		int b_real_index = search_real_index(meta_plain, b_ctr_index);
 		byte b_ctr_block[AES::BLOCKSIZE];
-		d.ProcessData(b_ctr_block, (const byte*)(this->main_data.data() + b_real_index), AES::BLOCK);
+		d.ProcessData(b_ctr_block, (const byte*)(this->main_data.data() + b_real_index), AES::BLOCKSIZE);
 		byte* b_ctr = find_ctr(b_ctr_block, b_block_index - b_ctr_index - 1);
 		memcpy(next_ctr, b_ctr, AES::BLOCKSIZE/2);
 		memcpy(b_ctr_block, b_ctr, AES::BLOCKSIZE/2);
