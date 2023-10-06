@@ -11,19 +11,25 @@ using namespace CryptoPP;
 class Modi_info
 {
 	private:
+		vector<byte> new_meta;
+		vector<byte> ins_list;
+		vector<byte> rep_list;
+
+	public:
 		int del_index;
 		int del_len;
 		int ins_index;
-		vector<byte> new_meta;
-		vector<byte> ins_list;
-
-	public:
+		int rep_index;
 
 		Modi_info();
 
-		void update_del_data(int index, int len);
+		void update_del_data(int len);
 
 		void update_ins_data(int index, vector<byte> list);
+
+		void update_ins_data(int index, byte* block);
+
+		void update_rep_data(int index, byte* block);
 
 		void update_metadata(vector<byte> metadata);
 
