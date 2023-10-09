@@ -29,6 +29,8 @@ class Modi_info
 
 		void update_ins_data(int index, byte* block);
 
+		void update_ins_data(int index, byte one);)
+
 		void update_rep_data(int index, byte* block);
 
 		void update_metadata(vector<byte> metadata);
