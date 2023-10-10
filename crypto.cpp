@@ -360,7 +360,7 @@ Modi_info bundled_CTR::Insertion(string text, int index)
 	{
 		in_index -= (int)meta_plain[i];
 	}
-	if(meta_plain[block_index] != AES::BLOCKSIZE)			// cut the first or last block of bundle
+	if(meta_plain[block_index] != 0 && meta_plain[block_index] != AES::BLOCKSIZE)			// cut the first or last block of bundle
 	{
 		string tmp_str = "";
 		if(meta_plain[block_index - 1] == 0x00) // cut the first block in bundle
@@ -384,7 +384,7 @@ Modi_info bundled_CTR::Insertion(string text, int index)
 		}
 		else                                    // cut the last block in bundle
 		{
-			int ctr_index = search_block_index(meta_plain, block_index);
+			int ctr_index = search_counter_block(meta_plain, block_index);
 			int dec_index = search_real_index(meta_plain, ctr_index);
 			int b_real_index = search_real_index(meta_plain, block_index);
 			byte ctr_block[AES::BLOCKSIZE];
@@ -395,7 +395,7 @@ Modi_info bundled_CTR::Insertion(string text, int index)
 			e.ProcessData(ctr_block, (const byte*)ctr_block, AES::BLOCKSIZE);
 			for(int i = in_index; i < meta_plain[block_index]; i++)
 			{
-				tmp_str += to_string(ctr_block[i]^this->main_data[b_real_index + i]);
+				tmp_str += (char)(ctr_block[i]^this->main_data[b_real_index + i]);
 			}
 			text = text + tmp_str;
 			this->main_data.erase(this->main_data.begin() + b_real_index + in_index, this->main_data.begin() + b_real_index + (int)meta_plain[block_index]);
