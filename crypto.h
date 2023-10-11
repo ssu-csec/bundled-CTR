@@ -47,6 +47,8 @@ vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key,
 
 vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte> metadata);
 
+vector<int> bundle_list_gen(vector<byte> metadata);
+
 int search_block_index(vector<byte> metadata, int index);
 
 int search_real_index(vector<byte> metadata, int index);
@@ -81,6 +83,8 @@ class bundled_CTR
 
 		Modi_info Replacement(string text, int index);
 		
+		int Fragcheck(vector<int> bundle_list, int range, int num);
+
 		void Defrag();
 };
 

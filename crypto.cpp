@@ -833,7 +833,40 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 	return modi_info;
 }
 
+int Fragcheck(vector<int> bundle_list, int range, int num)
+{
+	int index = -1;
+	if(bundle_list.size() > num)
+	{
+		for(int i = 0; i < bundle_list.size() - num; i++)
+		{
+			if(bundle_list[i] + range > bundle_list[i + num + 1])
+			{	
+				index = i;
+				break;
+			}
+		}
+
+	}
+	return index;
+}
+
 void bundled_CTR::Defrag()
 {
+	int range = 7;
+	int num = 3;
+	byte recent_ctr[AES::BLOCKSIZE/2];
+	vector<byte> meta_plain = metadata_dec(this->meta_data, this->key, this->nonce, recent_ctr);
+	vector<int> bundle_list = bundle_list_gen(meta_plain);
+	int index = Fragcheck(bundle_list, range, num);
+	while(index != -1)
+	{
+		int real_index = search_real_index(meta_plain, bundle_list[i]);
+		// decrypt from bundle[i] to bundle[i + num] and gather plaintext
+		index = Fragcheck(bundle_list, range, num);
+	}
+
+	return;
 }
+
 
