@@ -833,14 +833,14 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 	return modi_info;
 }
 
-int Fragcheck(vector<int> bundle_list, int range, int num)
+int bundled_CTR::Fragcheck(vector<int> bundle_list, int range, int num)
 {
 	int index = -1;
 	if(bundle_list.size() > num)
 	{
-		for(int i = 0; i < bundle_list.size() - num; i++)
+		for(int i = 0; i < bundle_list.size() - num - 1; i++)
 		{
-			if(bundle_list[i] + range > bundle_list[i + num + 1])
+			if(bundle_list[i] + range > bundle_list[i + num + 1])		// the num of bundles have less than the range of blocks
 			{	
 				index = i;
 				break;
@@ -856,15 +856,59 @@ void bundled_CTR::Defrag()
 	int range = 7;
 	int num = 3;
 	byte recent_ctr[AES::BLOCKSIZE/2];
+	byte next_ctr[AES::BLOCKSIZE/2] = {0x00, };
 	vector<byte> meta_plain = metadata_dec(this->meta_data, this->key, this->nonce, recent_ctr);
 	vector<int> bundle_list = bundle_list_gen(meta_plain);
+	bundle_list.push_back(meta_plain.size());
+	
+	ECB_Mode<AES>::Encryption ecb_enc;
+	ecb_enc.SetKey(this->key, sizeof(this->key));
+	ECB_Mode<AES>::Decryption ecb_dec;
+	ecb_dec.SetKey(this->key, sizeof(this->key));
+	CTR_Mode<AES>::Encryption ctr_enc;
+	CTR_Mode<AES>::Decryption ctr_dec;
+	
 	int index = Fragcheck(bundle_list, range, num);
 	while(index != -1)
 	{
-		int real_index = search_real_index(meta_plain, bundle_list[i]);
-		// decrypt from bundle[i] to bundle[i + num] and gather plaintext
+		string tmp_str;
+		byte counter[AES::BLOCKSIZE];
+		int modi_index = 0;
+		for(int i = index; i < index + num; i++)
+		{
+			int real_index = search_real_index(meta_plain, bundle_list[i]);
+			if(i == index)
+			{
+				modi_index = real_index;
+			}
+			ecb_dec.ProcessData(counter, (const byte*)(this->main_data.data() + real_index), AES::BLOCKSIZE);
+			memcpy(next_ctr, counter + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
+			memcpy(counter + AES::BLOCKSIZE/2, counter, AES::BLOCKSIZE/2);
+			memcpy(counter, this->nonce, AES::BLOCKSIZE/2);
+			ctr_dec.SetKeyWithIV(this->key, sizeof(this->key), counter);
+			int dec_len = search_real_index(meta_plain, bundle_list[i + num + 1]) - real_index;
+			byte* tmp_dec = new byte[dec_len + AES::BLOCKSIZE];
+			memset(tmp_dec, 0x00, sizeof(tmp_dec));
+			ctr_dec.ProcessData(tmp_dec, (const byte*)(this->main_data.data() + real_index + (int)meta_plain[bundle_list[i] + 1]), dec_len + AES::BLOCKSIZE - (int)meta_plain[bundle_list[i] + 1]);
+			for(int j = AES::BLOCKSIZE - (int)meta_plain[bundle_list[i] + 1]; j < sizeof(tmp_dec); j++)
+			{
+				tmp_str += tmp_dec[j];
+			}
+			delete[] tmp_dec;
+			this->main_data.erase(this->main_data.begin() + real_index, this->main_data.begin() + real_index + dec_len);
+		}					// gather plaintext in small bundles
+		vector<byte> new_data = encryption(this->nonce, recent_ctr, tmp_str, this->key, next_ctr);
+		vector<byte> new_meta = metadata_gen(tmp_str.length());
+		this->main_data.insert(this->main_data.begin() + modi_index, new_data.begin(), new_data.end());
+		meta_plain.erase(meta_plain.begin() + bundle_list[index], meta_plain.begin() + bundle_list[index + num + 1]);
+		meta_plain.insert(meta_plain.begin() + bundle_list[index], new_meta.begin(), new_meta.end());
+		bundle_list = bundle_list_gen(meta_plain);
 		index = Fragcheck(bundle_list, range, num);
+		byte* rec_ctr = find_ctr(recent_ctr, new_meta.size() - 1);
+		memcpy(recent_ctr, rec_ctr, AES::BLOCKSIZE/2);
+		delete[] rec_ctr;
 	}
+	this->meta_data = metadata_enc(meta_plain, recent_ctr, this->key, this->nonce);
 
 	return;
 }
