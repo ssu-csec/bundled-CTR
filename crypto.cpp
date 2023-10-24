@@ -183,6 +183,7 @@ vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte
 		else
 		{
 			// insert block data to tmp_bundle
+			//if(plain_meta[i - 1] == (byte)0x00 && plain_meta.size() - 1 != i)
 			if(plain_meta[i - 1] == (byte)0x00 && plain_meta.size() - 1 != i && plain_meta[i + 1] != 0x00)			// first data block of a bundle
 			{
 				tmp_num = AES::BLOCKSIZE - (int)plain_meta[i];
@@ -604,7 +605,8 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 		if(b_ctr_index == b_block_index)						// case3: remove back part of a bundle
 		{
 			memcpy(f_ctr_block + AES::BLOCKSIZE/2, b_ctr_block, AES::BLOCKSIZE/2);
-			meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index);
+			meta_plain.insert(meta_plain.begin() + b_block_index, 0x00);
+			// meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index);
 		}
 		else
 		{
@@ -648,9 +650,9 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 			modi_info.update_ins_data(0, this->main_data.data() + b_remove_index);
 			
 			b_in_index = (int)meta_plain[b_block_index] - b_in_index;
-			meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index + 1);
-			meta_plain.insert(meta_plain.begin() + f_block_index, (byte)b_in_index);
-			meta_plain.insert(meta_plain.begin() + f_block_index, 0x00);
+			// meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index + 1);
+			meta_plain.insert(meta_plain.begin() + b_block_index + 1,(byte)b_in_index);
+			meta_plain.insert(meta_plain.begin() + b_block_index + 1, 0x00);
 		}
 
 		if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index - 1] == 0x00)			// remove back part of the first block in bundle
@@ -663,6 +665,8 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 				d.ProcessData(prev_ctr_block, (const byte*)(this->main_data.data() + prev_real), AES::BLOCKSIZE);
 				memcpy(prev_ctr_block + AES::BLOCKSIZE/2, recent_ctr, AES::BLOCKSIZE/2);
 				e.ProcessData(this->main_data.data() + prev_real, (const byte*)prev_ctr_block, AES::BLOCKSIZE);
+				modi_info.rep_index = prev_real;
+				modi_info.update_rep_data(0, this->main_data.data() + prev_real);
 			}
 
 			byte dec_block[AES::BLOCKSIZE];
@@ -678,9 +682,9 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 			byte tmp_byte;
 			for(int i = 0; i < f_in_index; i++)
 			{
-				tmp_byte = dec_block[(AES::BLOCKSIZE - meta_plain[f_block_index]) + i]^this->main_data[f_real_index + i - f_in_index];
-				this->main_data[f_real_index + i - f_in_index] = tmp_byte^enc_block[(AES::BLOCKSIZE - meta_plain[f_block_index]) + i];
-				modi_info.update_ins_data(i, this->main_data[f_real_index + i - f_in_index]);
+				tmp_byte = dec_block[(AES::BLOCKSIZE - meta_plain[f_block_index]) + i]^this->main_data[f_real_index + AES::BLOCKSIZE+ i];
+				this->main_data[f_real_index + AES::BLOCKSIZE + i] = tmp_byte^enc_block[i];
+				modi_info.update_ins_data(i, this->main_data[f_real_index + i]);
 				modi_info.del_len++;
 				modi_info.del_index--;
 			}
@@ -690,9 +694,9 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 			memcpy(recent_ctr, tmp_recent_ctr, AES::BLOCKSIZE/2);
 			delete[] tmp_recent_ctr;
 		}
-
+		meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index + 1);
 		meta_plain.insert(meta_plain.begin() + f_block_index, (byte)f_in_index);
-		e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);      // replace first countunter block of previous bundle
+		e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);      // replace first counter block of previous bundle
 		modi_info.rep_index = f_real_index;
 		modi_info.update_rep_data(0, this->main_data.data() + f_real_index);
 	}
@@ -709,6 +713,7 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 	Modi_info modi_info;
 	byte recent_ctr[AES::BLOCKSIZE/2] = {0x00, };		// which save the next counter of recently used counter
 	byte next_ctr[AES::BLOCKSIZE/2] = {0x00, };			// which save the next counter of inserted data bundle
+	byte same_next_ctr[AES::BLOCKSIZE/2] = {0x00, }; 	// which save the next counter of front bundle and is used when front bundle and back bundle are same
 	vector<byte> meta_plain = metadata_dec(this->meta_data, this->key, this->nonce, recent_ctr);
 	vector<int> bundle_list = bundle_list_gen(meta_plain);
 
@@ -725,12 +730,12 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 		f_in_index -= (int)meta_plain[i];
 	}   
 	int b_in_index = index + text.length();
-	for(int i = 0; i < b_in_index; i++)
+	for(int i = 0; i < b_block_index; i++)
 	{   
 		b_in_index -= (int)meta_plain[i];
 	}
 
-	if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index - 1] == 0x00)            // cut the first block in bundle
+	if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index] != 0x00 && meta_plain[f_block_index - 1] == 0x00)            // cut the first block in bundle
 	{   
 		string tmp_str = ""; 
 		int dec_index = search_real_index(meta_plain, f_block_index - 1); 
@@ -744,8 +749,6 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 			tmp_str += to_string(ctr_block[(AES::BLOCKSIZE - (int)meta_plain[f_block_index]) + i]^this->main_data[dec_index + AES::BLOCKSIZE + i]);
 		}   
 		text = tmp_str + text;
-		this->main_data.erase(this->main_data.begin() + dec_index + AES::BLOCKSIZE, this->main_data.begin() + dec_index + AES::BLOCKSIZE + f_in_index);
-		meta_plain[f_block_index] -= (byte)f_in_index;
 		f_block_index--;
 		f_in_index = 0;
 	}
@@ -767,20 +770,20 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 			tmp_str += to_string(ctr_block[i]^this->main_data[real_index + i]);
 		}
 		text = text + tmp_str;
-		this->main_data.erase(this->main_data.begin() + real_index + b_in_index, this->main_data.begin() + real_index + (int)meta_plain[b_block_index]);
-		meta_plain[b_block_index] = (byte)b_in_index;
 		b_block_index++;
 		delete[] index_block_ctr;
 		b_in_index = 0;
 	}
+	int f_ctr_index;
+	int b_ctr_index;
 	int f_rep_index = search_real_index(meta_plain, f_block_index) + f_in_index;
 	int b_rep_index = search_real_index(meta_plain, b_block_index) + b_in_index;
-	
+	modi_info.del_len = b_rep_index - f_rep_index;	
 	if (meta_plain[f_block_index] == 0x00)		// case1-1: replace from the front part of a bundle
 	{
 		if(f_block_index != 0)
 		{
-			int f_ctr_index = search_counter_block(meta_plain, f_block_index - 1);
+			f_ctr_index = search_counter_block(meta_plain, f_block_index - 1);
 			int f_real_index = search_real_index(meta_plain, f_ctr_index);
 			byte f_ctr_block[AES::BLOCKSIZE];
 			d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
@@ -792,16 +795,20 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 	}
 	else										// case1-2: replace from the middle of a bundle
 	{
-		int f_ctr_index = search_counter_block(meta_plain, f_block_index);
+		f_ctr_index = search_counter_block(meta_plain, f_block_index);
 		int f_real_index = search_real_index(meta_plain, f_ctr_index);
 		byte f_ctr_block[AES::BLOCKSIZE];
 		d.ProcessData(f_ctr_block, (const byte*)(this->main_data.data() + f_real_index), AES::BLOCKSIZE);
+		memcpy(same_next_ctr, f_ctr_block + AES::BLOCKSIZE/2, AES::BLOCKSIZE/2);
 		memcpy(f_ctr_block + AES::BLOCKSIZE/2, recent_ctr, AES::BLOCKSIZE/2);
 		e.ProcessData(this->main_data.data() + f_real_index, (const byte*)f_ctr_block, AES::BLOCKSIZE);				// replace the counter block of previous bundle
 		modi_info.rep_index = f_real_index;
 		modi_info.update_rep_data(0, this->main_data.data() + f_real_index);
 	}
-	if (meta_plain[b_block_index] == 0x00)      // case2-1: replace to the end part of a bundle
+	
+	modi_info.del_index = f_rep_index;
+
+	if (b_block_index == meta_plain.size() || meta_plain[b_block_index] == 0x00)      // case2-1: replace to the end part of a bundle
 	{
 		int b_real_index = search_real_index(meta_plain, b_block_index);
 		byte b_ctr_block[AES::BLOCKSIZE] = {0x00, };
@@ -810,23 +817,37 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 	}
 	else                            			// case2-2: remove to the middle of a bundle
 	{
-		int b_ctr_index = search_counter_block(meta_plain, b_block_index);
+		b_ctr_index = search_counter_block(meta_plain, b_block_index);
 		int b_real_index = search_real_index(meta_plain, b_ctr_index);
 		byte b_ctr_block[AES::BLOCKSIZE];
 		d.ProcessData(b_ctr_block, (const byte*)(this->main_data.data() + b_real_index), AES::BLOCKSIZE);
 		byte* b_ctr = find_ctr(b_ctr_block, b_block_index - b_ctr_index - 1);
 		memcpy(next_ctr, b_ctr, AES::BLOCKSIZE/2);
 		memcpy(b_ctr_block, b_ctr, AES::BLOCKSIZE/2);
+		if(f_ctr_index == b_ctr_index)
+		{
+			memcpy(b_ctr_block + AES::BLOCKSIZE/2, same_next_ctr, AES::BLOCKSIZE/2);
+		}
 		e.ProcessData(b_ctr_block, (const byte*)b_ctr_block, AES::BLOCKSIZE);
 		this->main_data.insert(this->main_data.begin() + b_rep_index, b_ctr_block, b_ctr_block + AES::BLOCKSIZE);
-		modi_info.update_ins_data(0, this->main_data.data() + b_rep_index);
+		meta_plain[b_block_index] -= (byte)b_in_index;
+		meta_plain.insert(meta_plain.begin() + b_block_index, 0x00); 
+		modi_info.update_ins_data(0, this->main_data[b_rep_index]);
+		modi_info.update_ins_data(0, b_ctr_block);
 	}
-	vector<byte> new_data = encryption(this->nonce, recent_ctr, text, this->key, next_ctr);
 	this->main_data.erase(this->main_data.begin() + f_rep_index, this->main_data.begin() + b_rep_index);
-	modi_info.del_len += b_rep_index - f_rep_index;
+	vector<byte> new_data = encryption(this->nonce, recent_ctr, text, this->key, next_ctr);
 	this->main_data.insert(this->main_data.begin() + f_rep_index, new_data.begin(), new_data.end());
+	vector<byte> new_meta = metadata_gen(text.length());
 	modi_info.update_ins_data(0, new_data);
 	modi_info.ins_index = f_rep_index;
+	if(f_in_index != 0x00)
+	{
+		meta_plain[f_block_index] = (byte)f_in_index;
+		f_block_index++;
+	}
+	meta_plain.erase(meta_plain.begin() + f_block_index, meta_plain.begin() + b_block_index);
+	meta_plain.insert(meta_plain.begin() + f_block_index, new_meta.begin(), new_meta.end());
 	this->meta_data = metadata_enc(meta_plain, recent_ctr, this->key, this->nonce);
 	
 	modi_info.update_metadata(this->meta_data);
