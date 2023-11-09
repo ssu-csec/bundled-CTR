@@ -93,6 +93,11 @@ vector<byte> metadata_enc(vector<byte> metadata, byte* counter, byte* key, byte*
 vector<byte> metadata_dec(vector<byte> meta_cipher, byte* key, byte* nonce, byte* rec_ctr)
 {
 	vector<byte> metadata;
+	if(meta_cipher.size() == 0)
+	{
+		fill_n(rec_ctr, AES::BLOCKSIZE/2, 0x00);
+		return metadata;
+	}
 	byte tmp_meta[meta_cipher.size()] = {(byte)0x00, };
 
 	byte iv[AES::BLOCKSIZE];
@@ -128,12 +133,15 @@ vector<byte> encryption(byte* nonce, byte* counter, string plaintext, byte* key,
 
 	for (int i = 0; i < AES::BLOCKSIZE; i++)
 		bundle.push_back(first_cipher[i]);
+	//bundle.reserve(plaintext.length());
 	for (int i = 0; i < plaintext.length(); i++)
 		bundle.push_back(0x00);
 
 	ctr.SetKeyWithIV(key, AES::DEFAULT_KEYLENGTH, iv);
 	ctr.ProcessData(bundle.data() + AES::BLOCKSIZE, (const byte*)plaintext.c_str(), plaintext.length());
-
+	//byte tmp_data[plaintext.length()];
+	//ctr.ProcessData(tmp_data, (const byte*)plaintext.c_str(), plaintext.length());
+	//memcpy(bundle.data() + AES::BLOCKSIZE, tmp_data, sizeof(tmp_data));
 	return bundle;
 }
 
@@ -321,6 +329,7 @@ bundled_CTR::bundled_CTR(byte* key, byte* nonce)
 	memcpy(this->key,key, AES::BLOCKSIZE);
 	memcpy(this->nonce,nonce, AES::BLOCKSIZE/2);
 }
+
 bundled_CTR::bundled_CTR(vector<byte> data, vector<byte> meta, byte* key, byte* nonce)
 {
 	this->main_data = data;
@@ -656,7 +665,7 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 			meta_plain.insert(meta_plain.begin() + b_block_index + 1, 0x00);
 		}
 
-		if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index - 1] == 0x00)			// remove back part of the first block in bundle
+		if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index - 1] == 0x00&& meta_plain[f_block_index + 1] != 0x00)			// remove back part of the first block in bundle
 		{
 			if(f_block_index - 1 != 0)
 			{
@@ -683,7 +692,7 @@ Modi_info bundled_CTR::Deletion(int del_len, int index)
 			byte tmp_byte;
 			for(int i = 0; i < f_in_index; i++)
 			{
-				tmp_byte = dec_block[(AES::BLOCKSIZE - meta_plain[f_block_index]) + i]^this->main_data[f_real_index + AES::BLOCKSIZE+ i];
+				tmp_byte = dec_block[(AES::BLOCKSIZE - (int)meta_plain[f_block_index]) + i]^this->main_data[f_real_index + AES::BLOCKSIZE+ i];
 				this->main_data[f_real_index + AES::BLOCKSIZE + i] = tmp_byte^enc_block[i];
 				modi_info.update_ins_data(i, this->main_data[f_real_index + i]);
 				modi_info.del_len++;
@@ -881,7 +890,7 @@ void bundled_CTR::Defrag()
 	byte next_ctr[AES::BLOCKSIZE/2] = {0x00, };
 	vector<byte> meta_plain = metadata_dec(this->meta_data, this->key, this->nonce, recent_ctr);
 	vector<int> bundle_list = bundle_list_gen(meta_plain);
-	bundle_list.push_back(meta_plain.size());
+	bundle_list.push_back(main_data.size());
 
 	ECB_Mode<AES>::Encryption ecb_enc;
 	ecb_enc.SetKey(this->key, sizeof(this->key));
