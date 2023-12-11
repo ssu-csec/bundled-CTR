@@ -745,7 +745,7 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 		b_in_index -= (int)meta_plain[i];
 	}
 
-	if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index] != 0x00 && meta_plain[f_block_index - 1] == 0x00)            // cut the first block in bundle
+	if(meta_plain[f_block_index] != AES::BLOCKSIZE && meta_plain[f_block_index] != 0x00 && meta_plain[f_block_index + 1] != 0x00 && meta_plain[f_block_index - 1] == 0x00)            // cut the first block in bundle
 	{   
 		string tmp_str = ""; 
 		int dec_index = search_real_index(meta_plain, f_block_index - 1); 
@@ -756,7 +756,7 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 		e.ProcessData(ctr_block, (const byte*)ctr_block, AES::BLOCKSIZE);
 		for (int i = 0; i < f_in_index; i++)
 		{   
-			tmp_str += to_string(ctr_block[(AES::BLOCKSIZE - (int)meta_plain[f_block_index]) + i]^this->main_data[dec_index + AES::BLOCKSIZE + i]);
+			tmp_str += (char)ctr_block[(AES::BLOCKSIZE - (int)meta_plain[f_block_index]) + i]^this->main_data[dec_index + AES::BLOCKSIZE + i];
 		}   
 		text = tmp_str + text;
 		f_block_index--;
@@ -777,7 +777,7 @@ Modi_info bundled_CTR::Replacement(string text, int index)
 		e.ProcessData(ctr_block, (const byte*)ctr_block, AES::BLOCKSIZE);
 		for(int i = b_in_index; i < meta_plain[b_block_index]; i++)
 		{
-			tmp_str += to_string(ctr_block[i]^this->main_data[real_index + i]);
+			tmp_str += (char)ctr_block[i]^this->main_data[real_index + i];
 		}
 		text = text + tmp_str;
 		b_block_index++;
