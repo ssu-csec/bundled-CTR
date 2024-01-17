@@ -45,7 +45,7 @@ For encrypting metadata, you need metadata generated with ```metadata_gen``` fun
 	vector<byte> decryption(byte* nonce, vector<byte> bundle, byte* key, vector<byte> metadata)
 ```
 
-For encryption data, you need 8-byte-size nonce, 8-byte-size counter, plaintext and 16-byte-sized key. Similarly, nonce, key are used when decrypting ciphertext bundles. ONe different thing is metadata in encrypted form.  
+For encryption data, you need 8-byte-size nonce, 8-byte-size counter, plaintext and 16-byte-sized key. Similarly, nonce, key are used when decrypting ciphertext bundles. One different thing is metadata in encrypted form.  
 ### Index Search
 
 ```C++
@@ -55,6 +55,7 @@ For encryption data, you need 8-byte-size nonce, 8-byte-size counter, plaintext 
 ```
 
 These functions are used when you have the index of plaintext and want to find the index at the ciphertext.
+
 The first input of these functions is metadata wirh decrypted form.
 
 ## Class
@@ -127,3 +128,51 @@ If you want to print your ciphertext, you can use ```print_data``` function in t
 ```C++
 b.print_data();
 ```
+
+## Test
+
+Users can compile and run test file on your local environment if you install all of the project.
+
+We have two test files: one for comparing execution times based on file sizes and the other for comparing execution times based on the size of data modified at once.
+
+To execute the files, proper text files must be prepared in advance.
+
+Therefore, users need to compile ```test_file_gen.cpp``` and execute it first.
+
+When users run ```the test_file_gen```, it creates text files ranging from 10KB to 390KB in 10KB increments.
+
+Each file has ```"(file size).txt"``` and the unit of file size is in bytes.
+
+### Test1 - Based on file sizes
+
+For Test1, ```(mode)_test1.cpp``` files need to be compiled. When running the excutable files, the text files previously created must be in the same folder.
+
+When running the file, users can see the text below:
+
+```bash
+	What size (KB): 
+```
+
+Then, write the file size in KB.
+
+The excutable file generates a text file which records the execution time of modification function.
+
+Recording file name has the form ```(mode)_(file size).txt``` and the unit of file size is in bytes.
+
+### Test2 - Based on the size of data modificated at once
+
+For Test2, ```(mode)_test2.cpp``` files need to be compiled. In Test2, users only need to put 200KB size file (204800.txt) in the same folder.
+
+When running the file, users can see the text below:
+
+```bash
+	What size (*10): 
+```
+
+Then, write the modified data size in byte.
+
+The excutable file generates a text file which records the execution time of modification function.
+
+Recording file name has the form ```(mode)_(file size).txt``` and the unit of file size is in bytes.
+
+
