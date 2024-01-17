@@ -56,24 +56,24 @@ int main()
 		auto start_time = chrono::high_resolution_clock::now();
 		auto end_time = chrono::high_resolution_clock::now();
 		int i = rand()%256;
-		//if(i%3 == 0)
-		//{   
+		if(i%3 == 0)
+		{   
 			start_time = chrono::high_resolution_clock::now();
 			Mode.Insertion(new_data, 102400);
 			end_time = chrono::high_resolution_clock::now();
-		//}
-		/*else if(i%3 == 1)
+		}
+		else if(i%3 == 1)
 		{
 			start_time = chrono::high_resolution_clock::now();
-			Mode.Deletion(size, (int)rand()%size);
+			Mode.Deletion(size, 102400);
 			end_time = chrono::high_resolution_clock::now();
-		}*/
-		/*else if(i%3 == 2)
+		}
+		else if(i%3 == 2)
 		{
 			start_time = chrono::high_resolution_clock::now();
-			Mode.Replacement(new_data, (int)rand()%size);
+			Mode.Replacement(new_data, 102400);
 			end_time = chrono::high_resolution_clock::now();
-		}*/
+		}
 		auto duration = chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 		timeStamp << duration.count() <<endl;
 		timeStamp.close();

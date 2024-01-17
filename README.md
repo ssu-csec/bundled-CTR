@@ -139,7 +139,9 @@ To execute the files, proper text files must be prepared in advance.
 
 Therefore, users need to compile ```test_file_gen.cpp``` and execute it first.
 
-When users run ```the test_file_gen```, it creates text files ranging from 10KB to 390KB in 10KB increments.
+When users run ```the test_file_gen```, it creates text files ranging from 10KB to 390KB in 10KB increments with 200KB size text file.
+
+Users must prepare 200KB size text file named ```204800.txt``` with any contents in English.
 
 Each file has ```"(file size).txt"``` and the unit of file size is in bytes.
 

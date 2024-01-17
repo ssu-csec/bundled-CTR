@@ -65,13 +65,13 @@ int main()
 		else if(i%3 == 1)
 		{
 			start_time = chrono::high_resolution_clock::now();
-			Mode.Deletion(size, (int)rand()%size);
+			Mode.Deletion(size, 102400);
 			end_time = chrono::high_resolution_clock::now();
 			/
 			else if(i%3 == 2)
 			{
 				start_time = chrono::high_resolution_clock::now();
-				Mode.Replacement(new_data, (int)rand()%size);
+				Mode.Replacement(new_data, 102400);
 				end_time = chrono::high_resolution_clock::now();
 			}
 			auto duration = chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);

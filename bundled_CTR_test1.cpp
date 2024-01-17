@@ -64,19 +64,19 @@ int main()
 		if(i%3 == 0)
 		{   
 			start_time = chrono::high_resolution_clock::now();
-			Mode.Insertion(new_data, (int)rand()%(size/100));
+			Mode.Insertion(new_data, size/2);
 			end_time = chrono::high_resolution_clock::now();
 		}
 		else if(i%3 == 1)
 		{
 			start_time = chrono::high_resolution_clock::now();
-			Mode.Deletion(100, (int)rand()%(size/100));
+			Mode.Deletion(100, size/2);
 			end_time = chrono::high_resolution_clock::now();
 		}
 		else if(i%3 == 2)
 		{
 			start_time = chrono::high_resolution_clock::now();
-			Mode.Replacement(new_data, (int)rand()%(size/100));
+			Mode.Replacement(new_data, size/2);
 			end_time = chrono::high_resolution_clock::now();
 		}
 		auto duration = chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
